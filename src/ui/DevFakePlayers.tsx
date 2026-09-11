@@ -28,6 +28,7 @@ import {
   styles,
   Title,
 } from './components';
+import { useTheme } from './theme';
 
 type RoleSnapshot = PrivatePlayerData & { uid: string };
 
@@ -147,65 +148,43 @@ export function DevFakePlayers({
           }
         />
       </View>
+      <Eyebrow>Fake player list</Eyebrow>
       {!records.length ? (
         <Body muted>No fake players on this browser/device yet.</Body>
       ) : (
-        records.map((record) => {
-          const uid = record.uid;
-          const publicPlayer = uid ? byUid[uid] : undefined;
-          const privateData = uid ? roles[uid] : undefined;
-          const joined = Boolean(publicPlayer);
-          return (
-            <View key={record.appName} style={{ gap: 8 }}>
-              <Title small>{record.displayName}</Title>
-              <Body muted>
-                {uid ? `UID: ${uid.slice(0, 8)}…` : 'Identity pending'} ·{' '}
-                {joined ? 'Joined this game' : 'Not in this game'}
-              </Body>
-              {publicPlayer && (
-                <Body>Public status: {publicPlayer.status}</Body>
-              )}
-              {privateData ? (
-                <Body>
-                  Private dev view: {privateData.role} ·{' '}
-                  {privateData.currentTeam} · {privateData.status}
-                </Body>
-              ) : (
-                <Body muted>
-                  Private role is available here after this fake player joins
-                  and the game starts.
-                </Body>
-              )}
-              {record.lastResult && <Body muted>{record.lastResult}</Body>}
-              <View style={styles.row}>
-                <Button
-                  secondary
-                  label="Join current game"
-                  disabled={Boolean(busy) || joined || game.status !== 'lobby'}
-                  onPress={() =>
-                    void run(`join-${record.appName}`, async () => {
-                      const { client } = await fakeAction(record, 'joinGame', {
-                        code: game.code,
-                        displayName: record.displayName,
-                      });
-                      await updateRecord(record.appName, (r) => ({
-                        ...r,
-                        uid: client.user.uid,
-                        lastResult: `Joined lobby ${game.code}.`,
-                      }));
-                    })
-                  }
-                />
-                <Button
-                  secondary
-                  label="Refresh private role"
-                  disabled={Boolean(busy)}
-                  onPress={() => void run('refresh', () => refreshRoles())}
-                />
-              </View>
-            </View>
-          );
-        })
+        <View style={styles.compactList}>
+          {records.map((record) => {
+            const uid = record.uid;
+            const publicPlayer = uid ? byUid[uid] : undefined;
+            const privateData = uid ? roles[uid] : undefined;
+            const joined = Boolean(publicPlayer);
+            return (
+              <FakePlayerRow
+                key={record.appName}
+                record={record}
+                joined={joined}
+                publicPlayer={publicPlayer}
+                privateData={privateData}
+                busy={Boolean(busy)}
+                gameStatus={game.status}
+                onJoin={() =>
+                  void run(`join-${record.appName}`, async () => {
+                    const { client } = await fakeAction(record, 'joinGame', {
+                      code: game.code,
+                      displayName: record.displayName,
+                    });
+                    await updateRecord(record.appName, (r) => ({
+                      ...r,
+                      uid: client.user.uid,
+                      lastResult: `Joined lobby ${game.code}.`,
+                    }));
+                  })
+                }
+                onRefresh={() => void run('refresh', () => refreshRoles())}
+              />
+            );
+          })}
+        </View>
       )}
       <View style={styles.row}>
         <Button
@@ -233,5 +212,103 @@ export function DevFakePlayers({
         implemented. This tool currently exercises the real lobby/start paths.
       </Body>
     </Card>
+  );
+}
+
+function FakePlayerRow({
+  record,
+  joined,
+  publicPlayer,
+  privateData,
+  busy,
+  gameStatus,
+  onJoin,
+  onRefresh,
+}: {
+  record: FakePlayerRecord;
+  joined: boolean;
+  publicPlayer: PublicPlayer | undefined;
+  privateData: RoleSnapshot | undefined;
+  busy: boolean;
+  gameStatus: PublicGame['status'];
+  onJoin: () => void;
+  onRefresh: () => void;
+}) {
+  const { colors } = useTheme();
+  return (
+    <View
+      accessibilityLabel={`Fake player row for ${record.displayName}`}
+      style={{
+        borderColor: colors.border,
+        borderWidth: 1,
+        borderRadius: 12,
+        padding: 12,
+        gap: 8,
+        backgroundColor: colors.raised,
+      }}
+    >
+      <View style={{ ...styles.row, justifyContent: 'space-between' }}>
+        <View style={{ flex: 1, minWidth: 150 }}>
+          <Body>{record.displayName}</Body>
+          <Body muted>
+            {record.uid ? `UID ${record.uid.slice(0, 8)}…` : 'No UID yet'}
+          </Body>
+        </View>
+        <StatusPill label={joined ? 'Joined' : 'Not joined'} />
+      </View>
+      <View style={styles.row}>
+        <CompactFact label="Public" value={publicPlayer?.status ?? '—'} />
+        <CompactFact
+          label="Private"
+          value={
+            privateData
+              ? `${privateData.role} · ${privateData.currentTeam} · ${privateData.status}`
+              : '—'
+          }
+        />
+      </View>
+      {record.lastResult && <Body muted>Last: {record.lastResult}</Body>}
+      <View style={styles.row}>
+        <Button
+          secondary
+          label={`Join ${record.displayName}`}
+          disabled={busy || joined || gameStatus !== 'lobby'}
+          onPress={onJoin}
+        />
+        <Button
+          secondary
+          label={`Refresh ${record.displayName}`}
+          disabled={busy}
+          onPress={onRefresh}
+        />
+      </View>
+    </View>
+  );
+}
+
+function CompactFact({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={{ minWidth: 120, flex: 1 }}>
+      <Eyebrow>{label}:</Eyebrow>
+      <Body>{value}</Body>
+    </View>
+  );
+}
+
+function StatusPill({ label }: { label: string }) {
+  const { colors } = useTheme();
+  return (
+    <View
+      style={{
+        borderColor: colors.border,
+        borderWidth: 1,
+        borderRadius: 999,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        backgroundColor: colors.surface,
+      }}
+    >
+      <Body muted>{label}</Body>
+    </View>
   );
 }

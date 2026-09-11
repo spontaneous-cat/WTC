@@ -182,6 +182,7 @@ export function Loading({
 export const styles = StyleSheet.create({
   stack: { gap: 18 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
+  compactList: { gap: 8 },
 });
 
 export function useAction() {

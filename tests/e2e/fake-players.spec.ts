@@ -31,20 +31,20 @@ test('developer can fill a local lobby with fake players and inspect their roles
   await expect(
     page.getByText('Developer test mode · emulators only'),
   ).toBeVisible();
+  await expect(page.getByText('Fake player list')).toBeVisible();
 
   for (const name of ['Fake One', 'Fake Two', 'Fake Three']) {
     await page.getByLabel('Fake player name', { exact: true }).fill(name);
     await page
       .getByRole('button', { name: 'Create fake', exact: true })
       .click();
-    await expect(page.getByText(name, { exact: true })).toBeVisible();
-    await page
-      .getByRole('button', { name: 'Join current game', exact: true })
-      .last()
+    const row = page.getByLabel(`Fake player row for ${name}`);
+    await expect(row).toBeVisible();
+    await expect(row.getByText('Not joined', { exact: true })).toBeVisible();
+    await row
+      .getByRole('button', { name: `Join ${name}`, exact: true })
       .click();
-    await expect(
-      page.getByText(`Joined lobby`, { exact: false }).last(),
-    ).toBeVisible();
+    await expect(row.getByText('Joined', { exact: true })).toBeVisible();
   }
 
   await expect(
@@ -59,12 +59,6 @@ test('developer can fill a local lobby with fake players and inspect their roles
   await page
     .getByRole('button', { name: 'Refresh fake roles', exact: true })
     .click();
-  await expect(
-    page.getByText('Private dev view:', { exact: false }),
-  ).toHaveCount(3);
-  await expect(
-    page.getByText(
-      /Private dev view: killer|Private dev view: good|Private dev view: neutral_exile/,
-    ),
-  ).toHaveCount(3);
+  await expect(page.getByText('Private:', { exact: false })).toHaveCount(3);
+  await expect(page.getByLabel(/Fake player row for Fake/)).toHaveCount(3);
 });

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1 - 2026-09-11
+
+- Convert fake-player controls from large tiles to a compact list layout (#11).
+
 ## 0.1.0 - 2026-09-11
 
 - Add an emulator-only fake-player developer harness for local lobby/start testing (#7).
