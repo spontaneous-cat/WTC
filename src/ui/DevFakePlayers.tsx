@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { doc, getDoc } from 'firebase/firestore';
 import type {
   PrivatePlayerData,
@@ -95,17 +95,26 @@ export function DevFakePlayers({
   const refreshRoles = async (inputRecords = records) => {
     const snapshots: Record<string, RoleSnapshot> = {};
     await Promise.all(
-      inputRecords.map(async (record) => {
-        const client = await fakePlayerClient(record);
-        const uid = client.user.uid;
-        const snapshot = await getDoc(
-          doc(client.db, `games/${game.id}/privatePlayerData/${uid}`),
-        );
-        if (snapshot.exists())
-          snapshots[uid] = { ...(snapshot.data() as PrivatePlayerData), uid };
-      }),
+      inputRecords
+        .filter((record) => record.uid && byUid[record.uid])
+        .map(async (record) => {
+          const client = await fakePlayerClient(record);
+          const uid = client.user.uid;
+          const snapshot = await getDoc(
+            doc(client.db, `games/${game.id}/privatePlayerData/${uid}`),
+          );
+          if (snapshot.exists())
+            snapshots[uid] = { ...(snapshot.data() as PrivatePlayerData), uid };
+        }),
     );
-    setRoles(snapshots);
+    setRoles((previous) => ({ ...previous, ...snapshots }));
+    await persist(
+      records.map((record) =>
+        record.uid && snapshots[record.uid]
+          ? { ...record, lastResult: 'Private role refreshed.' }
+          : record,
+      ),
+    );
   };
 
   if (!devModeEnabled) {
@@ -152,7 +161,7 @@ export function DevFakePlayers({
       {!records.length ? (
         <Body muted>No fake players on this browser/device yet.</Body>
       ) : (
-        <View style={styles.compactList}>
+        <View testID="fake-player-list">
           {records.map((record) => {
             const uid = record.uid;
             const publicPlayer = uid ? byUid[uid] : undefined;
@@ -180,7 +189,9 @@ export function DevFakePlayers({
                     }));
                   })
                 }
-                onRefresh={() => void run('refresh', () => refreshRoles())}
+                onRefresh={() =>
+                  void run('refresh', () => refreshRoles([record]))
+                }
               />
             );
           })}
@@ -190,7 +201,11 @@ export function DevFakePlayers({
         <Button
           secondary
           label="Refresh fake roles"
-          disabled={Boolean(busy)}
+          disabled={
+            Boolean(busy) ||
+            game.status !== 'active' ||
+            !records.some((record) => record.uid && byUid[record.uid])
+          }
           onPress={() => void run('refresh', () => refreshRoles())}
         />
         <Button
@@ -238,47 +253,37 @@ function FakePlayerRow({
   return (
     <View
       accessibilityLabel={`Fake player row for ${record.displayName}`}
-      style={{
-        borderColor: colors.border,
-        borderWidth: 1,
-        borderRadius: 12,
-        padding: 12,
-        gap: 8,
-        backgroundColor: colors.raised,
-      }}
+      style={[listStyles.row, { borderColor: colors.border }]}
     >
-      <View style={{ ...styles.row, justifyContent: 'space-between' }}>
-        <View style={{ flex: 1, minWidth: 150 }}>
-          <Body>{record.displayName}</Body>
-          <Body muted>
-            {record.uid ? `UID ${record.uid.slice(0, 8)}…` : 'No UID yet'}
-          </Body>
-        </View>
-        <StatusPill label={joined ? 'Joined' : 'Not joined'} />
+      <View style={listStyles.details}>
+        <Text style={[listStyles.name, { color: colors.text }]}>
+          {record.displayName}
+        </Text>
+        <Text style={[listStyles.fact, { color: colors.muted }]}>
+          {joined ? 'Joined' : 'Not joined'} · Public:{' '}
+          {publicPlayer?.status ?? '—'}
+        </Text>
+        <Text style={[listStyles.fact, { color: colors.text }]}>
+          Private:{' '}
+          {privateData
+            ? `${privateData.role} · ${privateData.currentTeam} · ${privateData.status}`
+            : '—'}
+        </Text>
+        <Text style={[listStyles.fact, { color: colors.muted }]}>
+          Last: {record.lastResult ?? '—'}
+        </Text>
       </View>
-      <View style={styles.row}>
-        <CompactFact label="Public" value={publicPlayer?.status ?? '—'} />
-        <CompactFact
-          label="Private"
-          value={
-            privateData
-              ? `${privateData.role} · ${privateData.currentTeam} · ${privateData.status}`
-              : '—'
-          }
-        />
-      </View>
-      {record.lastResult && <Body muted>Last: {record.lastResult}</Body>}
-      <View style={styles.row}>
-        <Button
-          secondary
-          label={`Join ${record.displayName}`}
+      <View style={listStyles.actions}>
+        <RowAction
+          label="Join"
+          playerName={record.displayName}
           disabled={busy || joined || gameStatus !== 'lobby'}
           onPress={onJoin}
         />
-        <Button
-          secondary
-          label={`Refresh ${record.displayName}`}
-          disabled={busy}
+        <RowAction
+          label="Refresh"
+          playerName={record.displayName}
+          disabled={busy || !joined || gameStatus !== 'active'}
           onPress={onRefresh}
         />
       </View>
@@ -286,29 +291,59 @@ function FakePlayerRow({
   );
 }
 
-function CompactFact({ label, value }: { label: string; value: string }) {
+function RowAction({
+  label,
+  playerName,
+  disabled,
+  onPress,
+}: {
+  label: string;
+  playerName: string;
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  const { colors } = useTheme();
   return (
-    <View style={{ minWidth: 120, flex: 1 }}>
-      <Eyebrow>{label}:</Eyebrow>
-      <Body>{value}</Body>
-    </View>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${label} ${playerName}`}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        listStyles.action,
+        {
+          backgroundColor: colors.raised,
+          opacity: disabled ? 0.45 : pressed ? 0.75 : 1,
+        },
+      ]}
+    >
+      <Text style={[listStyles.actionLabel, { color: colors.text }]}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
-function StatusPill({ label }: { label: string }) {
-  const { colors } = useTheme();
-  return (
-    <View
-      style={{
-        borderColor: colors.border,
-        borderWidth: 1,
-        borderRadius: 999,
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        backgroundColor: colors.surface,
-      }}
-    >
-      <Body muted>{label}</Body>
-    </View>
-  );
-}
+const listStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  details: { flex: 1, minWidth: 0, gap: 2 },
+  name: { fontSize: 16, lineHeight: 22, fontWeight: '600' },
+  fact: { fontSize: 14, lineHeight: 20 },
+  actions: { width: 68, gap: 4 },
+  action: {
+    minHeight: 48,
+    paddingHorizontal: 4,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 6,
+  },
+  actionLabel: { fontSize: 14, fontWeight: '600', textAlign: 'center' },
+});

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.2 - 2026-09-11
+
+- Replace fake-player tiles with separator-based list rows and short, accessible actions; prevent long-name overflow (#11).
+- Make row refresh target only that fake player and show its latest successful refresh result (#11).
+- Restore actual-role assertions and verify list density, touch targets, and non-admin guardrails at phone widths (#11).
+
 ## 0.1.1 - 2026-09-11
 
 - Convert fake-player controls from large tiles to a compact list layout (#11).

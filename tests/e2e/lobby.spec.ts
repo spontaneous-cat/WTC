@@ -68,6 +68,10 @@ test('four players create/join/start, privately mark suspicions, and reconnect',
       await expect(
         p.getByRole('button', { name: 'Edit game setup', exact: true }),
       ).toHaveCount(0);
+      await expect(
+        p.getByText('Developer test mode · emulators only'),
+      ).toHaveCount(0);
+      await expect(p.getByLabel(/Fake player row for /)).toHaveCount(0);
     }
     await expect(
       admin.getByRole('heading', { name: 'Players · 4/4' }),
@@ -80,6 +84,12 @@ test('four players create/join/start, privately mark suspicions, and reconnect',
       await expect(
         p.getByRole('heading', { name: 'Trust carefully.' }),
       ).toBeVisible();
+      if (p !== admin) {
+        await expect(
+          p.getByText('Developer test mode · emulators only'),
+        ).toHaveCount(0);
+        await expect(p.getByLabel(/Fake player row for /)).toHaveCount(0);
+      }
       await expect(
         p.getByRole('heading', { name: /^(Killer|Minion|Collective|Exile)$/ }),
       ).toHaveCount(0);
