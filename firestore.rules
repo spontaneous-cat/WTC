@@ -1,0 +1,36 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function member(gameId) {
+      return signedIn() && request.auth.uid in get(/databases/$(database)/documents/games/$(gameId)).data.playerIds;
+    }
+    match /profiles/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+    }
+    match /games/{gameId} {
+      allow get: if member(gameId);
+      match /players/{uid} {
+        allow read: if member(gameId);
+      }
+      match /privatePlayerData/{uid} {
+        allow get: if member(gameId) && request.auth.uid == uid;
+      }
+      match /log/{entryId} {
+        allow read: if member(gameId);
+      }
+      match /owners/{uid}/suspicions/{targetId} {
+        allow read: if member(gameId) && request.auth.uid == uid;
+        allow create, update: if member(gameId) && request.auth.uid == uid
+          && targetId in get(/databases/$(database)/documents/games/$(gameId)).data.playerIds
+          && request.resource.data.keys().hasAll(['suspectedRole', 'updatedAt'])
+          && request.resource.data.keys().hasOnly(['suspectedRole', 'updatedAt'])
+          && request.resource.data.suspectedRole in ['unknown', 'killer', 'minion', 'good', 'neutral_exile']
+          && request.resource.data.updatedAt == request.time;
+      }
+    }
+    // No client writes to authoritative state or projections. No access to code
+    // reservations, hidden server state, or other unspecified collections.
+    match /{document=**} { allow read, write: if false; }
+  }
+}

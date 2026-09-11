@@ -1,0 +1,12 @@
+node_modules
+functions/lib
+dist
+dist-native
+test-results
+playwright-report
+.expo
+package-lock.json
+.wtc-scaffold
+.pi
+docs/WTC_PROJECT_SPEC.md
+*-debug.log
