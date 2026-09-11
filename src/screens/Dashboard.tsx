@@ -10,6 +10,8 @@ import {
   type SuspectedRole,
 } from '../../shared/contracts';
 import { api } from '../data/api';
+import { devModeRequested } from '../data/devMode';
+import { DevFakePlayers } from '../ui/DevFakePlayers';
 import { useCollection, useDocument } from '../data/hooks';
 import {
   Body,
@@ -75,12 +77,16 @@ export function Dashboard({
         <History gameId={game.id} active={active} retry={retry} />
       )}
       {tab === 'Settings' && <Settings game={game} />}
+      {game.adminUid === uid && devModeRequested && (
+        <DevFakePlayers game={game} players={players} />
+      )}
       <Card>
         <Eyebrow>Development preview</Eyebrow>
         <Body muted>
-          This slice supports lobbies, private roles, and suspicion markers.
-          Kill reports, voting, game-end results, and admin gameplay controls
-          are not implemented yet. Do not use it to run a full game.
+          This slice supports lobbies, private roles, suspicion markers, and an
+          emulator-only fake-player harness. Kill reports, voting, game-end
+          results, and admin gameplay controls are not implemented yet. Do not
+          use it to run a full game.
         </Body>
       </Card>
     </View>

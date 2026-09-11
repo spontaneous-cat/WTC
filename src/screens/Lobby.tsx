@@ -17,6 +17,8 @@ import {
   useAction,
 } from '../ui/components';
 import { SetupForm } from '../ui/SetupForm';
+import { DevFakePlayers } from '../ui/DevFakePlayers';
+import { devModeRequested } from '../data/devMode';
 
 export function Lobby({
   game,
@@ -113,6 +115,9 @@ export function Lobby({
           <Body muted>Waiting for the creator to begin.</Body>
         )}
       </Card>
+      {admin && devModeRequested && (
+        <DevFakePlayers game={game} players={players} />
+      )}
     </View>
   );
 }

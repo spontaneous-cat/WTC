@@ -64,6 +64,29 @@ The current emulator command does **not** export/import data automatically. Rest
 
 The current app permits one unfinished game per identity. Leave/end/reset UI is not implemented yet. Use separate browser profiles/devices for manual multi-player testing, or the automated browser test (four isolated contexts).
 
+## Emulator-only fake-player developer mode
+
+A local fake-player harness is available for one developer using a computer and, optionally, a phone as the real player/admin. It is explicitly gated by both settings below and only talks to the `demo-wtc` Auth, Firestore, and Functions emulators:
+
+```bash
+EXPO_PUBLIC_USE_EMULATORS=true
+EXPO_PUBLIC_DEV_MODE=true
+```
+
+Restart Expo after changing either value. The fake-player panel appears only for the game creator and creates isolated anonymous Auth emulator users in local app storage, then uses the same callable Cloud Functions as real players to join lobbies. After the game starts, the developer panel can inspect fake players' private roles for repeatable manual testing; normal player UI and Firestore rules still cannot read another player's private role.
+
+Current scope: fake players can be created, joined to the current lobby, reset from local storage, and refreshed after start. Server-side leave/remove, kill reports, nominations, ballots, alerts, and completed game flows are not implemented yet, so the panel labels those controls as pending future authoritative actions.
+
+For a computer-plus-phone test:
+
+1. Start emulators on the computer with `npm run emulators`.
+2. Set `EXPO_PUBLIC_DEV_MODE=true` and keep `EXPO_PUBLIC_EMULATOR_HOST=auto` (or your LAN IPv4 address).
+3. Start Expo with `npm run start:lan`.
+4. Open the admin/player on the computer or phone, create a lobby, then use the creator-only fake-player panel to fill remaining seats.
+5. If emulator data is reset, also use **Reset local fake players** or clear browser/app storage so old local fake identities do not point at deleted games.
+
+Fake-player controls must not be used for staging or production builds. With `EXPO_PUBLIC_USE_EMULATORS=false`, the app disables dev mode even if `EXPO_PUBLIC_DEV_MODE=true` is accidentally set.
+
 ## Automated checks
 
 ```bash

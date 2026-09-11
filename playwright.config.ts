@@ -22,6 +22,7 @@ export default defineConfig({
     env: {
       EXPO_PUBLIC_USE_EMULATORS: 'true',
       EXPO_PUBLIC_EMULATOR_HOST: '127.0.0.1',
+      EXPO_PUBLIC_DEV_MODE: 'true',
     },
   },
 });
