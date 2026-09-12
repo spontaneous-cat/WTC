@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Share, View } from 'react-native';
 import {
   ROLES,
@@ -19,6 +18,8 @@ import {
 import { SetupForm } from '../ui/SetupForm';
 import { DevFakePlayers } from '../ui/DevFakePlayers';
 import { devModeRequested } from '../data/devMode';
+import { GameRules, GameSettings } from './GameInfo';
+import { useNestedScreen } from '../ui/navigation';
 
 export function Lobby({
   game,
@@ -31,26 +32,79 @@ export function Lobby({
   uid: string;
   connected: boolean;
 }) {
-  const [editing, setEditing] = useState(false);
+  const { screen, navigate, back } = useNestedScreen<
+    'lobby' | 'menu' | 'settings' | 'rules' | 'setup'
+  >('lobby');
   const { busy, error, run } = useAction();
   const admin = game.adminUid === uid;
-  if (editing && admin)
+  if (screen === 'setup' && admin)
     return (
-      <Card>
-        <SetupForm
-          initial={game.setup}
-          onCancel={() => setEditing(false)}
-          onSave={async (setup) => {
-            await api.configure(game.id, setup);
-            setEditing(false);
-          }}
-        />
-      </Card>
+      <View style={styles.stack}>
+        <Button secondary label="Back to lobby" onPress={back} />
+        <Card>
+          <SetupForm
+            initial={game.setup}
+            onCancel={back}
+            onSave={async (setup) => {
+              await api.configure(game.id, setup);
+              back();
+            }}
+          />
+        </Card>
+      </View>
+    );
+  if (screen === 'settings')
+    return (
+      <View style={styles.stack}>
+        <Button secondary label="Back to lobby" onPress={back} />
+        <GameSettings game={game} />
+      </View>
+    );
+  if (screen === 'rules')
+    return (
+      <View style={styles.stack}>
+        <Button secondary label="Back to lobby" onPress={back} />
+        <GameRules />
+      </View>
+    );
+  if (screen === 'menu')
+    return (
+      <View style={styles.stack}>
+        <Button secondary label="Back to lobby" onPress={back} />
+        <Card>
+          <Title small>Menu</Title>
+          <Body muted>Navigate without revealing hidden game information.</Body>
+          <Button label="Game settings" onPress={() => navigate('settings')} />
+          <Button
+            secondary
+            label="Game rules"
+            onPress={() => navigate('rules')}
+          />
+          {admin && (
+            <Button
+              secondary
+              label="Edit game setup"
+              disabled={!connected}
+              onPress={() => navigate('setup')}
+            />
+          )}
+          {admin && devModeRequested && (
+            <Body muted>
+              Developer tools are available on the lobby screen.
+            </Body>
+          )}
+        </Card>
+      </View>
     );
   return (
     <View style={styles.stack}>
-      <Eyebrow>The gathering</Eyebrow>
-      <Title>Your circle is forming.</Title>
+      <View style={{ ...styles.row, justifyContent: 'space-between' }}>
+        <View style={{ flex: 1 }}>
+          <Eyebrow>The gathering</Eyebrow>
+          <Title>Your circle is forming.</Title>
+        </View>
+        <Button secondary label="Open menu" onPress={() => navigate('menu')} />
+      </View>
       <Card>
         <Eyebrow>Game code</Eyebrow>
         <Title>{game.code}</Title>
@@ -101,7 +155,7 @@ export function Lobby({
               secondary
               label="Edit game setup"
               disabled={busy || !connected}
-              onPress={() => setEditing(true)}
+              onPress={() => navigate('setup')}
             />
             <Button
               label={busy ? 'Starting…' : 'Begin the game'}

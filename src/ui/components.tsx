@@ -34,7 +34,8 @@ export function Title({
 export function Body({
   children,
   muted = false,
-}: PropsWithChildren<{ muted?: boolean }>) {
+  bold = false,
+}: PropsWithChildren<{ muted?: boolean; bold?: boolean }>) {
   const { colors } = useTheme();
   return (
     <Text
@@ -42,6 +43,7 @@ export function Body({
         color: muted ? colors.muted : colors.text,
         fontSize: 16,
         lineHeight: 24,
+        fontWeight: bold ? '700' : '400',
       }}
     >
       {children}

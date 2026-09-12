@@ -57,6 +57,40 @@ test('four players create/join/start, privately mark suspicions, and reconnect',
     await expect(
       admin.getByRole('button', { name: 'Begin the game', exact: true }),
     ).toBeDisabled();
+    await admin.getByRole('button', { name: 'Open menu', exact: true }).click();
+    await expect(admin.getByRole('heading', { name: 'Menu' })).toBeVisible();
+    await admin.screenshot({
+      path: testInfo.outputPath('lobby-menu.png'),
+      fullPage: true,
+    });
+    await admin
+      .getByRole('button', { name: 'Game settings', exact: true })
+      .click();
+    await expect(
+      admin.getByRole('heading', { name: 'Game settings' }),
+    ).toBeVisible();
+    await expect(admin.getByText('Players: 4', { exact: true })).toBeVisible();
+    await admin
+      .getByRole('button', { name: 'Back to lobby', exact: true })
+      .click();
+    await expect(
+      admin.getByRole('heading', { name: 'Your circle is forming.' }),
+    ).toBeVisible();
+    await admin.getByRole('button', { name: 'Open menu', exact: true }).click();
+    await admin
+      .getByRole('button', { name: 'Game rules', exact: true })
+      .click();
+    await expect(
+      admin.getByRole('heading', { name: 'Game rules' }),
+    ).toBeVisible();
+    await admin.screenshot({
+      path: testInfo.outputPath('lobby-rules.png'),
+      fullPage: true,
+    });
+    await admin.goBack();
+    await expect(
+      admin.getByRole('heading', { name: 'Your circle is forming.' }),
+    ).toBeVisible();
     for (let i = 1; i < pages.length; i++) {
       const p = pages[i]!;
       await namePlayer(p, `Player ${i}`);
@@ -108,6 +142,33 @@ test('four players create/join/start, privately mark suspicions, and reconnect',
       'Exile',
       'Killer',
     ]);
+    await admin.getByRole('button', { name: 'Open menu', exact: true }).click();
+    await admin
+      .getByRole('button', { name: 'Game settings', exact: true })
+      .click();
+    await expect(
+      admin.getByRole('heading', { name: 'Game settings' }),
+    ).toBeVisible();
+    await admin.screenshot({
+      path: testInfo.outputPath('dashboard-settings.png'),
+      fullPage: true,
+    });
+    await admin
+      .getByRole('button', { name: 'Back to dashboard', exact: true })
+      .click();
+    await expect(
+      admin.getByRole('heading', { name: 'Trust carefully.' }),
+    ).toBeVisible();
+    await admin.getByRole('button', { name: 'Open menu', exact: true }).click();
+    await admin
+      .getByRole('button', { name: 'Game rules', exact: true })
+      .click();
+    await expect(
+      admin.getByRole('heading', { name: 'Game rules' }),
+    ).toBeVisible();
+    await admin
+      .getByRole('button', { name: 'Back to dashboard', exact: true })
+      .click();
     await admin.getByRole('button', { name: 'Players', exact: true }).click();
     await admin
       .getByRole('button', { name: 'Set suspicion for Player 1', exact: true })
@@ -122,6 +183,7 @@ test('four players create/join/start, privately mark suspicions, and reconnect',
     await expect(
       pages[1]!.getByText('Your guess: Killer', { exact: true }),
     ).toHaveCount(0);
+    await admin.getByRole('button', { name: 'Open menu', exact: true }).click();
     await admin.getByRole('button', { name: 'History', exact: true }).click();
     await expect(
       admin.getByText('The game has begun. Your role is ready.', {

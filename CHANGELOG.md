@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.3 - 2026-09-11
+
+- Add lobby and dashboard menus with settings, game rules, and history navigation (#8).
+- Add explicit back controls and browser/native nested-screen back handling (#8).
+- Add generic MVP game-rules reference content without exposing hidden game state (#8).
+
 ## 0.1.2 - 2026-09-11
 
 - Replace fake-player tiles with separator-based list rows and short, accessible actions; prevent long-name overflow (#11).

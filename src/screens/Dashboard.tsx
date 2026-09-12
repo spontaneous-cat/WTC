@@ -13,6 +13,8 @@ import { api } from '../data/api';
 import { devModeRequested } from '../data/devMode';
 import { DevFakePlayers } from '../ui/DevFakePlayers';
 import { useCollection, useDocument } from '../data/hooks';
+import { GameRules, GameSettings } from './GameInfo';
+import { useNestedScreen } from '../ui/navigation';
 import {
   Body,
   Button,
@@ -25,7 +27,7 @@ import {
   useAction,
 } from '../ui/components';
 
-type Tab = 'Role' | 'Players' | 'History' | 'Settings';
+type Screen = 'role' | 'players' | 'history' | 'settings' | 'rules' | 'menu';
 export function Dashboard({
   game,
   players,
@@ -39,23 +41,34 @@ export function Dashboard({
   active: boolean;
   retry: number;
 }) {
-  const [tab, setTab] = useState<Tab>('Role');
+  const { screen, navigate, back } = useNestedScreen<Screen>('role');
   return (
     <View style={styles.stack}>
-      <Eyebrow>The game is underway · {game.code}</Eyebrow>
-      <Title>Trust carefully.</Title>
-      <View style={styles.row}>
-        {(['Role', 'Players', 'History', 'Settings'] as Tab[]).map((item) => (
-          <Button
-            key={item}
-            secondary
-            selected={item === tab}
-            label={item}
-            onPress={() => setTab(item)}
-          />
-        ))}
+      <View style={{ ...styles.row, justifyContent: 'space-between' }}>
+        <View style={{ flex: 1 }}>
+          <Eyebrow>The game is underway · {game.code}</Eyebrow>
+          <Title>Trust carefully.</Title>
+        </View>
+        <Button secondary label="Open menu" onPress={() => navigate('menu')} />
       </View>
-      {tab === 'Role' && (
+      <View style={styles.row}>
+        <Button
+          secondary
+          selected={screen === 'role'}
+          label="Role"
+          onPress={() => navigate('role')}
+        />
+        <Button
+          secondary
+          selected={screen === 'players'}
+          label="Players"
+          onPress={() => navigate('players')}
+        />
+      </View>
+      {screen !== 'role' && (
+        <Button secondary label="Back to dashboard" onPress={back} />
+      )}
+      {screen === 'role' && (
         <RoleCard
           key={String(active)}
           gameId={game.id}
@@ -64,7 +77,7 @@ export function Dashboard({
           retry={retry}
         />
       )}
-      {tab === 'Players' && (
+      {screen === 'players' && (
         <Players
           game={game}
           players={players}
@@ -73,10 +86,31 @@ export function Dashboard({
           retry={retry}
         />
       )}
-      {tab === 'History' && (
+      {screen === 'history' && (
         <History gameId={game.id} active={active} retry={retry} />
       )}
-      {tab === 'Settings' && <Settings game={game} />}
+      {screen === 'settings' && <GameSettings game={game} />}
+      {screen === 'rules' && <GameRules />}
+      {screen === 'menu' && (
+        <Card>
+          <Title small>Menu</Title>
+          <Body muted>Secondary screens and reference information.</Body>
+          <Button label="Game settings" onPress={() => navigate('settings')} />
+          <Button
+            secondary
+            label="Game rules"
+            onPress={() => navigate('rules')}
+          />
+          <Button
+            secondary
+            label="History"
+            onPress={() => navigate('history')}
+          />
+          {game.adminUid === uid && devModeRequested && (
+            <Body muted>Developer tools remain on the dashboard.</Body>
+          )}
+        </Card>
+      )}
       {game.adminUid === uid && devModeRequested && (
         <DevFakePlayers game={game} players={players} />
       )}
@@ -260,31 +294,6 @@ function History({
           </View>
         ))
       )}
-    </Card>
-  );
-}
-function Settings({ game }: { game: PublicGame }) {
-  return (
-    <Card>
-      <Title small>Game settings</Title>
-      <Body muted>Read-only. Initial role composition is locked.</Body>
-      <Body>Players: {game.setup.playerCount}</Body>
-      {ROLE_IDS.map((role) => (
-        <Body key={role}>
-          {ROLES[role].name}: {game.setup.roles[role]}
-        </Body>
-      ))}
-      <Body>Vote cooldown: {game.setup.timers.cooldown} seconds</Body>
-      <Body>Discussion: {game.setup.timers.discussion} seconds</Body>
-      <Body>Voting: {game.setup.timers.voting} seconds</Body>
-      <Body>Grace period: {game.setup.timers.grace} seconds</Body>
-      <Body>
-        Visible live voting: {game.setup.visibleLiveVoting ? 'On' : 'Off'}
-      </Body>
-      <Body>
-        Manual corrections:{' '}
-        {game.setup.manualCorrectionsEnabled ? 'Enabled' : 'Disabled'}
-      </Body>
     </Card>
   );
 }
