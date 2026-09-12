@@ -1,98 +1,94 @@
 ---
 name: github-issue-writer
-description: Creates concise, actionable GitHub issues from a user prompt using the GitHub CLI. Use when the user wants an issue filed, clarifying only necessary ambiguities and keeping each issue scoped to one simple task.
+description: Categorizes and creates concise, actionable GitHub issues from a user prompt using the GitHub CLI. It splits complex work into nested issues where practical. Use when the user wants an issue filed.
 compatibility: Requires GitHub CLI (`gh`) installed, authenticated, and run from or pointed at a GitHub repository.
 ---
 
 # GitHub Issue Writer
 
-Create concise, actionable GitHub issues from the user's prompt using `gh`.
+Create the lowest-complexity actionable issue or set of nested issues that satisfies the user's request. Use clear imperative language that an AI agent can execute.
 
-## Principles
+## Issue types
 
-- Write only what is necessary for a human developer or AI agent to act.
-- Prefer exactly one GitHub issue for one simple task.
-- If the prompt contains multiple simple tasks, ask whether to split them unless the split is explicitly requested.
-- Create sub-issues only when the work is genuinely too large for one issue. Sub-issues must be separate GitHub issues, not checklist sections inside the main issue.
-- Ask clarifying questions only when missing information would materially change the title, scope, repository, priority, or acceptance criteria.
-- If details are minor or inferable, proceed and note assumptions only when useful.
-- Keep issue content compact, clear, direct, and testable.
-- Do not include secrets, private credentials, or hidden/internal data in the issue.
+Apply exactly one label to every issue:
+
+- **`agent:quick`** — A local, low-risk change. Require the smallest diff and targeted validation. Do not require broad research or tests unless they provide meaningful regression protection.
+- **`agent:standard`** — A bounded change requiring inspection of relevant components, meaningful tests, affected test suites, and static checks. Avoid unrelated refactoring.
+- **`agent:deep`** — Architectural, cross-cutting, uncertain, compatibility-sensitive, or otherwise high-risk work. Require investigation, a plan before implementation, TDD where appropriate, broad regression testing, and edge-case consideration.
+
+Favor `agent:quick`. Use `agent:standard` only when the work needs the stated inspection and regression coverage. Use `agent:deep` only when the work genuinely needs architectural investigation or broad validation. Do not classify work as deep merely because it is a feature.
 
 ## Workflow
 
-1. **Confirm environment**
-   - Check repository context and authentication when needed:
-     ```bash
-     gh repo view --json nameWithOwner,url
-     gh auth status
-     ```
-   - If outside the target repo or multiple repos are plausible, ask which repo or use `gh issue create --repo OWNER/REPO` if provided.
+1. **Confirm context**
+   ```bash
+   gh repo view --json nameWithOwner,url
+   gh auth status
+   gh label list --limit 100
+   ```
+   Create any missing type labels before creating issues:
+   ```bash
+   gh label create "agent:quick" --color "0E8A16"
+   gh label create "agent:standard" --color "1D76DB"
+   gh label create "agent:deep" --color "5319E7"
+   ```
+   Inspect only the documentation and code needed to determine the outcome, type, and specific context files. Do not perform broad research for a quick issue.
 
 2. **Clarify only blockers**
-   Ask at most 1-3 focused questions if necessary, such as:
-   - Which repository should receive this issue?
-   - Is this a bug, feature, chore, or research task?
-   - What outcome or acceptance criteria is required?
-   - Are there priority, milestone, label, assignee, or deadline requirements?
+   Ask one focused question at a time only when missing information materially changes the repository, outcome, scope, or acceptance criteria. Infer minor details from the repository and prompt.
 
-3. **Draft the issue**
-   Use the shortest structure that is sufficient. Omit sections that add no value.
+3. **Decompose before drafting**
+   - Prefer one `agent:quick` issue for a local task.
+   - Split a multi-part or deep request into the smallest independently actionable related issues where practical.
+   - Create a parent issue for the overall outcome and make the implementation tasks nested sub-issues. Give every parent and child its own type label; a parent may be `agent:deep` while its children are quick or standard.
+   - Do not create a separate issue for work that cannot be independently implemented or reviewed.
 
+4. **Draft each issue**
+   Use this compact structure:
    ```markdown
+   ## Type
+   `agent:quick`
+
    ## Summary
-   <1-2 sentences describing the task>
+   <imperative, outcome-oriented task>
+
+   ## Agent Context
+   Inspect and change these files first:
+   - `<path>` — <why this file is relevant>
+   - `<path>` — <why this file is relevant>
+   Inspect other files only when necessary to satisfy an acceptance criterion.
 
    ## Acceptance Criteria
    - [ ] <observable completion criterion>
-   - [ ] <test/validation criterion, if relevant>
+   - [ ] <validation required by the issue type>
 
    ## Notes
-   - <constraints, assumptions, links, or context only if needed>
+   - <constraints, assumptions, links, or child-issue links only when needed>
    ```
+   - Use an imperative or outcome-oriented title, ideally no more than 80 characters.
+   - Name precise files to inspect and change whenever they are known. Do not list the entire repository or invent paths. State when a path is inspection-only.
+   - Make criteria observable. For visual work, require verification of the requested result with representative content, long names, overflow, readability, and reachable actions when relevant.
+   - Require only targeted validation for quick issues; meaningful tests and affected static checks for standard issues; and broad regression, compatibility, and edge-case validation for deep issues.
 
-   Guidance:
-   - Title: imperative or outcome-oriented, <= 80 characters when practical.
-   - Scope each issue to a single, simple task.
-   - Make acceptance criteria verifiable; avoid vague items like "improve stuff".
-   - Include a work plan only when it materially clarifies implementation.
-   - Include testing/validation expectations when relevant.
-
-4. **Create issue(s)**
-   Prefer a temporary body file to preserve formatting:
-
+5. **Create and nest issues**
+   Create issues using a temporary body file and the selected type label:
    ```bash
-   tmp=$(mktemp)
-   cat > "$tmp" <<'EOF'
-   <issue body markdown>
-   EOF
-   gh issue create --title "<title>" --body-file "$tmp" <optional flags>
-   rm "$tmp"
+   gh issue create --title "<title>" --label "agent:quick" --body-file "$tmp"
    ```
+   Create the parent first. Then nest each child with the GitHub API:
+   ```bash
+   gh api --method POST repos/<owner>/<repo>/issues/<parent-number>/sub_issues -f sub_issue_id=<child-number>
+   ```
+   Add linked child numbers to the parent's Notes after creation. Do not represent sub-issues only as a checklist in one issue body.
 
-   Optional flags may include:
-   - `--repo OWNER/REPO`
-   - `--label "label"`
-   - `--assignee "@me"` or `--assignee "user"`
-   - `--milestone "milestone"`
+6. **Report**
+   Return the created issue URL(s), their types, and one-line summaries. Report the exact blocker if creation or nesting fails.
 
-5. **Sub-issues, only when needed**
-   If the work must be decomposed:
-   - Create a concise main issue that states the overall outcome and links to the sub-issues.
-   - Create each sub-issue as its own GitHub issue scoped to one simple task.
-   - In each sub-issue, include `Parent: #<main issue number>` near the top of the body.
-   - In the main issue, add a short checklist of linked sub-issue numbers after creating them.
-   - Do not use `### Sub-issue:` sections inside a single issue body.
+## Quality checklist
 
-6. **Report result**
-   Return the created issue URL(s) and a one-line summary. If creation fails, report the exact blocker and next action.
-
-## Quality Checklist
-
-Before creating the issue, ensure:
-
-- The title matches the desired outcome.
-- Each issue is scoped to one simple task.
-- Complex work is decomposed into separate linked GitHub issues only when needed.
-- Acceptance criteria are testable.
-- Labels/assignees/milestone are included only when requested or obvious.
+- Every issue has exactly one `agent:*` label and matching Type section.
+- The chosen type is the lowest justified complexity.
+- Each issue is independently actionable and has precise Agent Context files.
+- Complex work is split into nested issues when practical.
+- Acceptance criteria and validation match the issue type.
+- Do not include secrets, credentials, or hidden/internal data.

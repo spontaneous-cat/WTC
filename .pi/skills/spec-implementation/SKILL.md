@@ -153,15 +153,23 @@ Before declaring work complete, run appropriate checks:
 
 If a command fails because of unrelated existing issues, capture the failure clearly and distinguish it from changes made for this task.
 
+For layout changes, capture a baseline before editing and matching after screenshots, then actually inspect both at relevant phone widths with representative content/states. Check the requested visual outcome, long names, overflow, readability, and reachable actions. Record viewport, evidence paths, and findings. Screenshot capture alone is not visual review; browser validation is not native-device validation. If comparison or inspection is unavailable, mark the visual requirement as awaiting review instead of claiming completion.
+
+Test meaningful displayed values and action outcomes, not just labels or container counts. Review removed or weakened assertions in the test diff and preserve equivalent regression coverage unless an approved requirement changed. Explain intentional removals; do not weaken tests to accommodate a refactor. Successful compilation and general test passes do not establish successful UX.
+
 ### 8. Track Spec Coverage
 
-Maintain a short checklist during implementation:
+Maintain a short checklist mapping each requirement or acceptance criterion to its implementation location, verification method, and evidence. Distinguish:
 
-- implemented requirements,
+- implemented but not yet verified requirements,
+- verified requirements, with validation results,
+- requirements awaiting visual or user review where needed,
 - partially implemented requirements,
 - deferred/out-of-scope items,
 - changed assumptions,
 - known gaps.
+
+Do not mark the spec complete while required outcomes are unmet or materially unverified. Report implemented, verified, and awaiting-review work separately in the handoff.
 
 For large projects, create or update a project-local progress file if helpful, for example:
 

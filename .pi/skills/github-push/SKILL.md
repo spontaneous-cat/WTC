@@ -1,123 +1,64 @@
 ---
 name: github-push
-description: Summarizes local changes, updates changelog and semantic version references, commits with a GitHub issue reference, and pushes to the GitHub repository. Use when the user asks to prepare and push completed changes.
+description: Prepares, versions, commits, and pushes completed categorized GitHub issue work without closing the issue. Use when the user asks to prepare and push completed changes.
 compatibility: Requires git, GitHub CLI (`gh`) authenticated, and a GitHub repository checkout.
 ---
 
 # GitHub Push
 
-Prepare a clean, traceable GitHub push for completed work.
-
-## Principles
-
-- Do not push without user confirmation unless the user explicitly requested an immediate push.
-- Every commit message must reference a GitHub issue.
-- Prefer one coherent commit per push unless changes are clearly separable.
-- Update `CHANGELOG.md` for every push; create it if missing.
-- Enforce semantic versioning. In general, increment the version for each push.
-- Update all in-repo references to the version before committing.
-- Never commit secrets, generated credentials, local env files, or unrelated changes.
+Prepare a clean, traceable push for one completed GitHub issue. Never close an issue; leave closure to the user.
 
 ## Workflow
 
-1. **Inspect repository state**
+1. **Inspect state and issue type**
    ```bash
    git status --short
    git branch --show-current
+   git diff
+   git diff --cached
    gh repo view --json nameWithOwner,url
+   gh issue view <number> --json number,title,body,labels,url,state
    ```
-   Review changed files with `git diff` and staged changes with `git diff --cached`.
+   Confirm the issue is open and has exactly one `agent:quick`, `agent:standard`, or `agent:deep` label. Stage only the intended issue files.
 
-2. **Identify the issue**
-   - Determine the issue number from the user prompt, branch name, existing notes, or recent issue context.
-   - If no issue is known, ask for one or offer to create an issue first.
-   - Commit message issue format:
-     - Use `(#123)` for a reference.
-     - Use `Fixes #123`, `Closes #123`, or `Resolves #123` only when the commit completes the issue.
-   - Recommended commit format:
-     ```text
-     <type>(<scope>): <short summary> (#123)
-     ```
-     Examples: `feat(auth): add password reset (#42)`, `fix(ui): correct settings layout (#57)`.
+2. **Apply the issue type**
+   - **`agent:quick`:** Preserve the smallest possible diff. Accept targeted validation evidence. Do not add broad validation work during the push.
+   - **`agent:standard`:** Confirm meaningful tests and affected static checks were run. Do not introduce unrelated refactoring.
+   - **`agent:deep`:** Confirm the approved plan, architecture/compatibility considerations, and broad regression evidence. Do not push if required approval or validation is missing.
 
-3. **Choose semantic version bump**
-   Follow SemVer:
-   - `PATCH` for bug fixes, docs, tests, internal chores, or non-breaking polish.
-   - `MINOR` for backward-compatible features.
-   - `MAJOR` for breaking changes, migrations, or incompatible behavior/API changes.
+3. **Version and changelog**
+   Follow the repository's existing release process. If this skill's versioning policy applies, choose the smallest valid SemVer bump:
+   - PATCH for fixes, docs, tests, chores, and polish.
+   - MINOR for backward-compatible features.
+   - MAJOR for breaking changes or migrations.
 
-   If unclear, ask. Otherwise choose the smallest valid bump.
+   Update `CHANGELOG.md` and intentional in-repository version references. Do not update dependency versions except package-version lockfile mirrors.
 
-4. **Update version references**
-   - Find current version sources, for example:
-     - `package.json`, `package-lock.json`, `npm-shrinkwrap.json`
-     - app manifests/config files
-     - source constants, about screens, docs, README badges
-   - Update every intentional in-repo reference from the old version to the new version.
-   - Do not edit dependency versions unless they are the project package version or lockfile mirrors of it.
-
-5. **Update changelog**
-   - Create `CHANGELOG.md` if missing.
-   - Keep entries short and useful.
-   - Add the new version at the top using this format:
-
-   ```markdown
-   # Changelog
-
-   ## <version> - <YYYY-MM-DD>
-   - <short change summary>
-   - <short change summary>
-   ```
-
-   - If a changelog already follows another reasonable format, preserve it.
-   - Mention issue references only when helpful, e.g. `- Add lobby validation (#123)`.
-
-6. **Validate**
-   Run the repository's relevant checks when practical, such as:
+4. **Commit**
+   Use a reference-only commit message. Never include a GitHub closing keyword in a subject or body:
    ```bash
-   npm run check
-   npm test
-   npm run build
-   ```
-   Use repo-native commands. If checks are unavailable or fail for unrelated reasons, note that clearly before pushing.
-
-7. **Commit**
-   Stage only intended files:
-   ```bash
-   git add <files>
+   git add <intended-files>
    git diff --cached
    git commit -m "<type>(<scope>): <summary> (#123)"
    ```
-   If the commit fully completes the issue, use a body with a closing keyword:
-   ```bash
-   git commit -m "<type>(<scope>): <summary> (#123)" -m "Fixes #123"
-   ```
+   Do not post an issue comment or change issue state unless the user separately asks.
 
-8. **Push**
+5. **Push**
+   Push when the user explicitly requested an immediate push, or when github-action has authorized it under its categorized workflow:
    ```bash
    git push
    ```
-   If upstream is missing:
+   If necessary:
    ```bash
    git push -u origin <branch>
    ```
 
-9. **Report**
-   Provide:
-   - version bumped from `<old>` to `<new>`,
-   - changelog updated/created,
-   - commit hash and issue reference,
-   - branch pushed,
-   - validation commands run and results,
-   - any failures or follow-up actions.
+6. **Report**
+   Report the version change, changelog status, commit hash, issue reference, branch, and validation evidence. State that the issue remains open for user review.
 
-## Safety Checklist
+## Safety checklist
 
-Before pushing, confirm:
-
-- `git status` contains only intended changes.
-- `CHANGELOG.md` is updated.
-- SemVer bump is correct.
-- All project version references are updated.
-- Commit message references an issue in GitHub format.
-- No secrets or unrelated files are staged.
+- Stage only intended files; never stage secrets, credentials, local environment files, or unrelated work.
+- Keep validation proportionate to the issue type.
+- Ensure the commit references the issue but never closes it.
+- Report failures and unmet criteria honestly; do not push incomplete work.

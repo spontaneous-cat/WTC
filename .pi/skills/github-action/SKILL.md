@@ -1,49 +1,73 @@
 ---
 name: github-action
-description: Implements a GitHub issue end to end. Reads the issue, proposes a short plan for approval, develops and tests it, then uses github-push to version, commit, and push. Use when the user asks to work on a GitHub issue.
+description: Implements one categorized GitHub issue with the smallest safe change, validates it at the issue's required depth, then uses github-push. Use when the user asks to work on a GitHub issue.
 compatibility: Requires git, GitHub CLI (`gh`) authentication, a GitHub repository checkout, and the github-push skill.
 ---
 
 # GitHub Action
 
-Implement one GitHub issue only after the user approves a concise plan.
+Implement one open GitHub issue. Its `agent:quick`, `agent:standard`, or `agent:deep` label controls this workflow. Do not close issues; the user decides whether an issue is complete.
 
-## Workflow
+## Load context
 
-1. **Load context**
+1. Run:
    ```bash
    gh repo view --json nameWithOwner,url
-   gh issue view <number> --json number,title,body,labels,url
+   gh issue view <number> --json number,title,body,labels,url,state
    git status --short
    ```
-   Read issue-linked docs and relevant repository code. Confirm the issue is open. Ask only if the issue is ambiguous, blocked, or conflicts with repository constraints.
+2. Confirm that the issue is open and has exactly one `agent:*` label. If it does not, ask the user to categorize it; do not guess or change its labels.
+3. Read the files named in the issue's **Agent Context** section first. Inspect another file only when those files, a direct import, an acceptance criterion, or a failing validation requires it. Do not perform broad repository research.
+4. Treat unrelated modified files as user work. Never stage, edit, revert, or validate them unless the issue explicitly requires them.
 
-2. **Propose, then stop**
-   Present no more than five numbered steps, including tests and likely files. State meaningful risks/assumptions in one line. Ask: **“Approve this plan?”**
+## Apply the issue type
 
-   Do not modify code, change issue status, commit, or push until the user explicitly approves.
+### `agent:quick`
 
-3. **Implement**
-   - Follow the approved plan; keep changes scoped to the issue.
-   - Use TDD where practical: add/update a failing test, implement minimally, then refactor.
-   - Respect project architecture, security/privacy constraints, and issue acceptance criteria.
-   - If scope materially changes or a blocker emerges, stop and request approval for a revised concise plan.
+- Expect a local, low-risk change.
+- Do not produce a detailed plan and do not ask for plan approval.
+- Make the smallest possible diff. Do not refactor adjacent code.
+- Do not add tests unless they provide meaningful regression protection.
+- Run only targeted validation for the changed behavior.
+- Stop as soon as every acceptance criterion passes, then push.
 
-4. **Validate**
-   Run the relevant unit, integration, security, UI, typecheck, lint, format, and build commands. Report any unrelated or unresolved failure honestly. Do not claim completion if issue acceptance criteria are unmet.
+### `agent:standard`
 
-5. **Push**
-   Load and follow [the GitHub Push skill](../github-push/SKILL.md).
-   - Use the issue number in the commit message.
-   - Update the changelog and all project version references.
-   - Close the issue in the commit only if the implementation fully satisfies it.
-   - Push only after the user has approved the plan; this approval also authorizes the resulting push.
+- Inspect the relevant components named by the issue.
+- State a brief implementation and validation plan, then implement immediately. Do not request approval.
+- Add or update meaningful regression tests.
+- Run affected test suites and relevant static checks.
+- Avoid unrelated refactoring. Stop and ask only if the issue is ambiguous, blocked, or materially expands.
 
-6. **Report**
-   Provide the issue URL, concise summary, validation results, version, commit hash, pushed branch, and whether the issue was closed.
+### `agent:deep`
+
+- Investigate the relevant architecture, dependencies, alternatives, compatibility, and edge cases before changing code.
+- Present a concise plan, risks, affected files, and validation approach. Ask **“Approve this plan?”** and stop.
+- After approval, use TDD where appropriate and implement only the approved scope.
+- Run broad regression tests and relevant static checks. Request revised approval if scope materially changes.
+
+## Implement and validate
+
+- Preserve project architecture, security/privacy constraints, and issue acceptance criteria.
+- Prefer the smallest correct change that satisfies the issue. Avoid unrelated refactoring, cleanup, or additional scope.
+- Validate proportionally to the risk and complexity of the change. Use the narrowest checks that provide meaningful confidence, and do not broaden or repeat verification without a specific reason.
+- Add or update tests when they provide meaningful behavioural or regression coverage. Do not add tests solely to mirror trivial implementation details, and do not weaken existing assertions to make a change pass.
+- For visual changes, do not spend unnecessary time validating the changes. If the issue does not require visual validation, do not run the browser test suite or inspect screenshots.
+- Verify meaningful displayed values and user actions where relevant.
+- Do not claim something was verified without direct evidence. Clearly report anything that remains unverified or does not meet the acceptance criteria.
+- For complex or high-risk work, maintain an acceptance checklist linking important criteria to their implementation and verification evidence. This is optional for small, low-risk changes.
+- Stop once the acceptance criteria are satisfied and the appropriate targeted checks pass.
+
+
+## Push and report
+
+1. Load and follow [the GitHub Push skill](../github-push/SKILL.md), passing the issue type and validation evidence.
+2. Use a reference-only issue commit such as `fix(scope): summary (#123)`. Never use `Fixes`, `Closes`, or `Resolves`.
+3. For `agent:quick` and `agent:standard`, the user's request to implement the issue authorizes the resulting scoped push. For `agent:deep`, the approved plan authorizes it.
+4. Report the issue URL, concise change summary, validation results, version, commit hash, and pushed branch. State that the issue remains open for user review.
 
 ## Guardrails
 
-- Never stage unrelated work or secrets.
-- Never bypass failing tests, required review, or project deployment approvals.
-- For multiple issues, handle one issue per invocation unless the user explicitly requests a combined plan.
+- Never stage unrelated work, secrets, or generated credentials.
+- Do not bypass failing required checks or deployment approvals.
+- Handle one issue per invocation unless the user explicitly requests otherwise.
