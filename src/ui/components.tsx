@@ -1,4 +1,9 @@
-import { useRef, useState, type PropsWithChildren } from 'react';
+import {
+  useRef,
+  useState,
+  type PropsWithChildren,
+  type ReactNode,
+} from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -181,6 +186,54 @@ export function Loading({
     </View>
   );
 }
+
+type CompactPlayer = {
+  id: string;
+  name: string;
+  status: string;
+  note?: ReactNode;
+  action?: ReactNode;
+  accessibilityLabel?: string;
+};
+
+export function CompactPlayerList({ players }: { players: CompactPlayer[] }) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ gap: 0 }}>
+      {players.map((player, index) => (
+        <View
+          key={player.id}
+          accessibilityLabel={
+            player.accessibilityLabel ?? `${player.name}, ${player.status}`
+          }
+          style={{
+            gap: 8,
+            paddingVertical: 10,
+            borderTopWidth: index === 0 ? 0 : 1,
+            borderTopColor: colors.border,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: 10,
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+            }}
+          >
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Body bold>{player.name}</Body>
+              <Body muted>{player.status}</Body>
+            </View>
+            {player.action ? <View>{player.action}</View> : null}
+          </View>
+          {player.note ? <View>{player.note}</View> : null}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 export const styles = StyleSheet.create({
   stack: { gap: 18 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' },

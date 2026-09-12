@@ -9,6 +9,7 @@ import {
   Body,
   Button,
   Card,
+  CompactPlayerList,
   ErrorMessage,
   Eyebrow,
   styles,
@@ -123,17 +124,17 @@ export function Lobby({
         <Title small>
           Players · {players.length}/{game.setup.playerCount}
         </Title>
-        {players.map((p) => (
-          <View key={p.uid} style={{ gap: 3 }}>
-            <Body>
-              {p.displayName}
-              {p.uid === uid ? ' (you)' : ''}
-            </Body>
-            {p.uid === game.adminUid && (
-              <Body muted>Game creator · settings only</Body>
-            )}
-          </View>
-        ))}
+        <CompactPlayerList
+          players={players.map((p) => ({
+            id: p.uid,
+            name: `${p.displayName}${p.uid === uid ? ' (you)' : ''}`,
+            status:
+              p.uid === game.adminUid
+                ? 'Waiting in lobby · game creator'
+                : 'Waiting in lobby',
+            accessibilityLabel: `Lobby player ${p.displayName}`,
+          }))}
+        />
       </Card>
       <Card>
         <Title small>The roles in play</Title>

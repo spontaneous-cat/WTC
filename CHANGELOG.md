@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.4 - 2026-09-12
+
+- Add a shared compact player-list component for lobby and active-game player displays (#9).
+- Render private suspicion guesses in compact active-game rows with reachable edit actions (#9).
+- Record targeted phone-width validation for compact player lists with long names (#9).
+
 ## 0.1.3 - 2026-09-11
 
 - Add lobby and dashboard menus with settings, game rules, and history navigation (#8).

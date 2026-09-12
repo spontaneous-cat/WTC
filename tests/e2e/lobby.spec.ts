@@ -91,9 +91,14 @@ test('four players create/join/start, privately mark suspicions, and reconnect',
     await expect(
       admin.getByRole('heading', { name: 'Your circle is forming.' }),
     ).toBeVisible();
+    const joinedNames = [
+      'Player 1 With a Very Long Display Name',
+      'Player 2',
+      'Player 3',
+    ];
     for (let i = 1; i < pages.length; i++) {
       const p = pages[i]!;
-      await namePlayer(p, `Player ${i}`);
+      await namePlayer(p, joinedNames[i - 1]!);
       await p.getByLabel('Game code', { exact: true }).fill(code);
       await p.getByRole('button', { name: 'Join game', exact: true }).click();
       await expect(
@@ -109,6 +114,9 @@ test('four players create/join/start, privately mark suspicions, and reconnect',
     }
     await expect(
       admin.getByRole('heading', { name: 'Players · 4/4' }),
+    ).toBeVisible();
+    await expect(
+      admin.getByLabel('Lobby player Player 1 With a Very Long Display Name'),
     ).toBeVisible();
     await admin
       .getByRole('button', { name: 'Begin the game', exact: true })
@@ -170,8 +178,20 @@ test('four players create/join/start, privately mark suspicions, and reconnect',
       .getByRole('button', { name: 'Back to dashboard', exact: true })
       .click();
     await admin.getByRole('button', { name: 'Players', exact: true }).click();
+    await expect(
+      admin.getByLabel(
+        'Player row Player 1 With a Very Long Display Name, Alive · last public status',
+      ),
+    ).toBeVisible();
+    await admin.screenshot({
+      path: testInfo.outputPath('compact-player-list-phone.png'),
+      fullPage: true,
+    });
     await admin
-      .getByRole('button', { name: 'Set suspicion for Player 1', exact: true })
+      .getByRole('button', {
+        name: 'Set suspicion for Player 1 With a Very Long Display Name',
+        exact: true,
+      })
       .click();
     await admin.getByRole('button', { name: 'Killer', exact: true }).click();
     await expect(

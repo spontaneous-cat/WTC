@@ -19,6 +19,7 @@ import {
   Body,
   Button,
   Card,
+  CompactPlayerList,
   ErrorMessage,
   Eyebrow,
   Loading,
@@ -203,62 +204,73 @@ function Players({
         publicly revealed information.
       </Body>
       <ErrorMessage message={suspicions.error ?? error} />
-      {players.map((p) => {
-        const suspected =
-          suspicions.data?.find((s) => s.id === p.uid)?.suspectedRole ??
-          'unknown';
-        return (
-          <Card key={p.uid}>
-            <Title small>
-              {p.displayName}
-              {p.uid === uid ? ' (you)' : ''}
-            </Title>
-            <Body muted>
-              {p.status === 'alive'
+      <Card>
+        <Title small>Players</Title>
+        <CompactPlayerList
+          players={players.map((p) => {
+            const suspected =
+              suspicions.data?.find((s) => s.id === p.uid)?.suspectedRole ??
+              'unknown';
+            const suspicionLabel =
+              suspected === 'unknown' ? 'Unknown' : ROLES[suspected].name;
+            const publicStatus =
+              p.status === 'alive'
                 ? 'Alive · last public status'
                 : p.status === 'dead'
                   ? 'Killed'
-                  : 'Voted out'}
-            </Body>
-            {p.uid !== uid && (
-              <>
-                <Body>
-                  Your guess:{' '}
-                  {suspected === 'unknown' ? 'Unknown' : ROLES[suspected].name}
-                </Body>
-                <Button
-                  secondary
-                  label={`Set suspicion for ${p.displayName}`}
-                  onPress={() => setSelected(selected === p.uid ? null : p.uid)}
-                />
-                {selected === p.uid && (
-                  <View style={styles.stack}>
-                    {(['unknown', ...ROLE_IDS] as SuspectedRole[]).map(
-                      (role) => (
-                        <Button
-                          key={role}
-                          secondary
-                          selected={role === suspected}
-                          disabled={busy}
-                          label={
-                            role === 'unknown' ? 'Unknown' : ROLES[role].name
-                          }
-                          onPress={() =>
-                            void run(async () => {
-                              await api.suspect(game.id, uid, p.uid, role);
-                              setSelected(null);
-                            })
-                          }
-                        />
-                      ),
+                  : 'Voted out';
+            return {
+              id: p.uid,
+              name: `${p.displayName}${p.uid === uid ? ' (you)' : ''}`,
+              status: publicStatus,
+              accessibilityLabel: `Player row ${p.displayName}, ${publicStatus}`,
+              action:
+                p.uid === uid ? undefined : (
+                  <Button
+                    secondary
+                    label={`Set suspicion for ${p.displayName}`}
+                    onPress={() =>
+                      setSelected(selected === p.uid ? null : p.uid)
+                    }
+                  />
+                ),
+              note:
+                p.uid === uid ? (
+                  <Body muted>Your own private role stays hidden here.</Body>
+                ) : (
+                  <View style={{ gap: 8 }}>
+                    <Body>Your guess: {suspicionLabel}</Body>
+                    {selected === p.uid && (
+                      <View style={styles.row}>
+                        {(['unknown', ...ROLE_IDS] as SuspectedRole[]).map(
+                          (role) => (
+                            <Button
+                              key={role}
+                              secondary
+                              selected={role === suspected}
+                              disabled={busy}
+                              label={
+                                role === 'unknown'
+                                  ? 'Unknown'
+                                  : ROLES[role].name
+                              }
+                              onPress={() =>
+                                void run(async () => {
+                                  await api.suspect(game.id, uid, p.uid, role);
+                                  setSelected(null);
+                                })
+                              }
+                            />
+                          ),
+                        )}
+                      </View>
                     )}
                   </View>
-                )}
-              </>
-            )}
-          </Card>
-        );
-      })}
+                ),
+            };
+          })}
+        />
+      </Card>
     </View>
   );
 }
