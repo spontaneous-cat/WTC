@@ -24,13 +24,16 @@ export async function readProfile(
 
 /** Write only changed projections. Hidden mutations must not even change a public
  * document's update timestamp, which could otherwise disclose secret activity. */
+function stripUndefined<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
 export function saveState(
   tx: Transaction,
   next: LobbyState,
   previous?: LobbyState,
 ) {
   if (next === previous) return;
-  tx.set(stateRef(next.id), next);
+  tx.set(stateRef(next.id), stripUndefined(next));
   const output = projectGame(next);
   const old = previous ? projectGame(previous) : undefined;
   const setIfChanged = (path: string, value: object, before: unknown) => {
@@ -48,11 +51,60 @@ export function saveState(
       old?.privatePlayers[uid],
     );
   }
+  for (const [roundId, round] of Object.entries(output.voteRounds)) {
+    setIfChanged(
+      `games/${next.id}/voteRounds/${roundId}`,
+      round,
+      old?.voteRounds[roundId],
+    );
+  }
   if (previous?.status === 'lobby' && next.status === 'active') {
     tx.set(db().doc(`games/${next.id}/log/game_started`), {
       type: 'game_started',
       message: 'The game has begun. Your role is ready.',
       createdAt: next.startedAt,
+    });
+  }
+  const oldRounds = previous?.voteRounds ?? {};
+  for (const round of Object.values(next.voteRounds ?? {})) {
+    const oldRound = oldRounds[round.id];
+    for (const nomination of round.nominations) {
+      if (!oldRound?.nominations.some((n) => n.id === nomination.id)) {
+        tx.set(db().doc(`games/${next.id}/log/nomination_${nomination.id}`), {
+          type: 'nomination_called',
+          message: 'A nomination has been called.',
+          createdAt: nomination.startedAt,
+        });
+      }
+      if (
+        nomination.result &&
+        !oldRound?.nominations.find((n) => n.id === nomination.id)?.result
+      ) {
+        tx.set(db().doc(`games/${next.id}/log/vote_result_${nomination.id}`), {
+          type: 'vote_result',
+          message: nomination.result.passed
+            ? 'A nominee is on the block.'
+            : 'The nomination did not receive enough votes.',
+          createdAt: nomination.votingEndsAt,
+        });
+      }
+    }
+    if (round.result && !oldRound?.result) {
+      const executed = round.result.executedPlayerId;
+      tx.set(db().doc(`games/${next.id}/log/vote_ended_${round.id}`), {
+        type: executed ? 'player_executed' : 'no_execution',
+        message: executed
+          ? 'A player was executed.'
+          : 'The vote ended with no execution.',
+        createdAt: round.endedAt,
+      });
+    }
+  }
+  if (next.status === 'ended' && previous?.status !== 'ended') {
+    tx.set(db().doc(`games/${next.id}/log/game_ended`), {
+      type: 'game_ended',
+      message: 'The game has ended.',
+      createdAt: next.endedAt,
     });
   }
 }

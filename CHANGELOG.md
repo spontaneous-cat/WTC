@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0 - 2026-09-12
+
+- Add authoritative nomination rounds, ballot casting, deadline advancement, execution resolution, and vote cooldown state (#3).
+- Preserve hidden role/death privacy in vote projections while revealing deaths at vote start (#3).
+- Document resolved voting threshold, hidden-ballot, self-nomination, cooldown, and timer-edit rules (#3).
+
 ## 0.1.4 - 2026-09-12
 
 - Add a shared compact player-list component for lobby and active-game player displays (#9).

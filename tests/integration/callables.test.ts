@@ -3,9 +3,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { initializeApp, deleteApp, type FirebaseApp } from 'firebase/app';
 import { connectAuthEmulator, getAuth, signInAnonymously } from 'firebase/auth';
 import {
+  collection,
   connectFirestoreEmulator,
   doc,
   getDoc,
+  getDocs,
   getFirestore,
   type Firestore,
 } from 'firebase/firestore';
@@ -74,6 +76,27 @@ const setup = {
   playerCount: 4,
   roles: { killer: 1, minion: 0, good: 2, neutral_exile: 1 },
 };
+const fastSetup = {
+  ...setup,
+  timers: { cooldown: 1, discussion: 1, voting: 15, grace: 1 },
+};
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+async function activeGame(
+  admin: Client,
+  members: Client[],
+  chosenSetup = setup,
+) {
+  const { gameId } = await call(
+    'createGame',
+    { displayName: 'Admin', setup: chosenSetup },
+    admin,
+  );
+  const code = (await getDoc(doc(admin.db, `games/${gameId}`))).data()!.code;
+  for (const [i, member] of members.entries())
+    await call('joinGame', { code, displayName: `P${i}` }, member);
+  await call('startGame', { gameId }, admin);
+  return gameId;
+}
 
 describe('callable lobby vertical slice', () => {
   it('requires authentication and validates requests', async () => {
@@ -182,6 +205,56 @@ describe('callable lobby vertical slice', () => {
         )
       ).gameId,
     ).toBe(gameId);
+  });
+  it('runs nomination, visible ballots, execution, and idempotent resolution', async () => {
+    const admin = await client();
+    const members = await Promise.all([client(), client(), client()]);
+    const gameId = await activeGame(admin, members, fastSetup);
+    await call(
+      'callNomination',
+      { gameId, nomineePlayerId: members[0]!.uid },
+      admin,
+    );
+    const gameAfterNomination = (
+      await getDoc(doc(admin.db, `games/${gameId}`))
+    ).data()!;
+    expect(gameAfterNomination.activeVoteRoundId).toBeTruthy();
+    const roundId = gameAfterNomination.activeVoteRoundId as string;
+    const roundRef = doc(admin.db, `games/${gameId}/voteRounds/${roundId}`);
+    let round = (await getDoc(roundRef)).data()!;
+    const nominationId = round.nominations[0].id as string;
+    await delay(1200);
+    await call('resolveVote', { gameId, roundId }, admin);
+    await Promise.all([
+      call('castVote', { gameId, roundId, nominationId, vote: true }, admin),
+      call(
+        'castVote',
+        { gameId, roundId, nominationId, vote: true },
+        members[0],
+      ),
+    ]);
+    await expect(
+      call('castVote', { gameId, roundId, nominationId, vote: false }, admin),
+    ).rejects.toThrow(/ALREADY_EXISTS/);
+    round = (await getDoc(roundRef)).data()!;
+    expect(round.nominations[0].yesCount).toBe(2);
+    await delay(17000);
+    await Promise.all([
+      call('resolveVote', { gameId, roundId }, admin),
+      call('resolveVote', { gameId, roundId }, members[1]),
+    ]);
+    const ended = (await getDoc(roundRef)).data()!;
+    expect(ended.result.executedPlayerId).toBe(members[0]!.uid);
+    expect(
+      (
+        await getDoc(
+          doc(admin.db, `games/${gameId}/players/${members[0]!.uid}`),
+        )
+      ).data()?.status,
+    ).toBe('votedOut');
+    expect(
+      (await getDocs(collection(admin.db, `games/${gameId}/log`))).docs.length,
+    ).toBeGreaterThan(1);
   });
   it('serializes concurrent joins without overfilling and prevents concurrent duplicate games', async () => {
     const admin = await client();

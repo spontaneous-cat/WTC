@@ -19,6 +19,9 @@ service cloud.firestore {
       match /log/{entryId} {
         allow read: if member(gameId);
       }
+      match /voteRounds/{roundId} {
+        allow read: if member(gameId);
+      }
       match /owners/{uid}/suspicions/{targetId} {
         allow read: if member(gameId) && request.auth.uid == uid;
         allow create, update: if member(gameId) && request.auth.uid == uid

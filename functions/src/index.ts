@@ -4,18 +4,25 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { setGlobalOptions } from 'firebase-functions/v2';
 import { z } from 'zod';
 import {
+  castVoteSchema,
   createGameSchema,
   gameActionSchema,
   joinGameSchema,
+  nominationSchema,
   renameSchema,
+  resolveVoteSchema,
   updateSetupSchema,
 } from '../../shared/contracts';
 import {
+  advanceVote,
+  callNomination as callDomainNomination,
+  castBallot,
   createLobby,
   DomainError,
   joinLobby,
   renamePlayer as renameDomainPlayer,
   startGame as startDomainGame,
+  updateRuntimeSettings as updateDomainRuntimeSettings,
   updateSetup,
   type LobbyState,
 } from '../../shared/lobby';
@@ -54,7 +61,9 @@ function action<T>(
       // Do not serialize server state, input, or secrets into logs/responses.
       console.error(
         'Game action failed',
-        error instanceof Error ? error.name : 'UnknownError',
+        error instanceof Error
+          ? `${error.name}: ${error.message}`
+          : 'UnknownError',
       );
       throw new HttpsError(
         'internal',
@@ -156,6 +165,42 @@ export const startGame = action(gameActionSchema, async (uid, input) =>
       Date.now(),
       () => randomInt(0, 2 ** 32) / 2 ** 32,
     ),
+  ),
+);
+export const updateRuntimeSettings = action(
+  updateSetupSchema,
+  async (uid, input) =>
+    changeGame(input.gameId, (state) =>
+      updateDomainRuntimeSettings(state, uid, input.setup, Date.now()),
+    ),
+);
+export const callNomination = action(nominationSchema, async (uid, input) =>
+  changeGame(input.gameId, (state) =>
+    callDomainNomination(
+      state,
+      uid,
+      input.nomineePlayerId,
+      Date.now(),
+      randomUUID(),
+      randomUUID(),
+    ),
+  ),
+);
+export const castVote = action(castVoteSchema, async (uid, input) =>
+  changeGame(input.gameId, (state) =>
+    castBallot(
+      state,
+      uid,
+      input.roundId,
+      input.nominationId,
+      input.vote,
+      Date.now(),
+    ),
+  ),
+);
+export const resolveVote = action(resolveVoteSchema, async (_uid, input) =>
+  changeGame(input.gameId, (state) =>
+    advanceVote(state, input.roundId, Date.now()),
   ),
 );
 export const renamePlayer = action(renameSchema, async (uid, input) =>

@@ -18,7 +18,19 @@ export const api = {
     action('joinGame', { displayName, code }),
   configure: (gameId: string, setup: Setup) =>
     action('updateLobbySettings', { gameId, setup }),
+  updateRuntimeSettings: (gameId: string, setup: Setup) =>
+    action('updateRuntimeSettings', { gameId, setup }),
   start: (gameId: string) => action('startGame', { gameId }),
+  nominate: (gameId: string, nomineePlayerId: string) =>
+    action('callNomination', { gameId, nomineePlayerId }),
+  castVote: (
+    gameId: string,
+    roundId: string,
+    nominationId: string,
+    vote: boolean,
+  ) => action('castVote', { gameId, roundId, nominationId, vote }),
+  resolveVote: (gameId: string, roundId: string) =>
+    action('resolveVote', { gameId, roundId }),
   rename: (displayName: string) => action('renamePlayer', { displayName }),
   suspect: (
     gameId: string,

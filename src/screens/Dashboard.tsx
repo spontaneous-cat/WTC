@@ -7,6 +7,7 @@ import {
   type PublicGame,
   type PublicLogEntry,
   type PublicPlayer,
+  type PublicVoteRound,
   type SuspectedRole,
 } from '../../shared/contracts';
 import { api } from '../data/api';
@@ -70,13 +71,22 @@ export function Dashboard({
         <Button secondary label="Back to dashboard" onPress={back} />
       )}
       {screen === 'role' && (
-        <RoleCard
-          key={String(active)}
-          gameId={game.id}
-          uid={uid}
-          active={active}
-          retry={retry}
-        />
+        <>
+          <RoleCard
+            key={String(active)}
+            gameId={game.id}
+            uid={uid}
+            active={active}
+            retry={retry}
+          />
+          <VotePanel
+            game={game}
+            players={players}
+            uid={uid}
+            active={active}
+            retry={retry}
+          />
+        </>
       )}
       {screen === 'players' && (
         <Players
@@ -118,10 +128,10 @@ export function Dashboard({
       <Card>
         <Eyebrow>Development preview</Eyebrow>
         <Body muted>
-          This slice supports lobbies, private roles, suspicion markers, and an
-          emulator-only fake-player harness. Kill reports, voting, game-end
-          results, and admin gameplay controls are not implemented yet. Do not
-          use it to run a full game.
+          This slice supports lobbies, private roles, suspicion markers,
+          nomination voting, and an emulator-only fake-player harness. Kill
+          reports, game-end results, and admin gameplay controls are not
+          implemented yet. Do not use it to run a full game.
         </Body>
       </Card>
     </View>
@@ -173,6 +183,121 @@ function RoleCard({
         label={revealed ? 'Hide my role' : 'Reveal my role'}
         onPress={() => setRevealed(!revealed)}
       />
+    </Card>
+  );
+}
+function VotePanel({
+  game,
+  players,
+  uid,
+  active,
+  retry,
+}: {
+  game: PublicGame;
+  players: PublicPlayer[];
+  uid: string;
+  active: boolean;
+  retry: number;
+}) {
+  const rounds = useCollection<PublicVoteRound>(
+    `games/${game.id}/voteRounds`,
+    active,
+    true,
+    retry,
+  );
+  const { busy, error, run } = useAction();
+  const activeRound = rounds.data?.find(
+    (round) => round.id === game.activeVoteRoundId,
+  );
+  const latestNomination = activeRound?.nominations.at(-1);
+  return (
+    <Card>
+      <Eyebrow>Voting</Eyebrow>
+      <Title small>
+        {activeRound ? 'Active nomination round' : 'Call a nomination'}
+      </Title>
+      <ErrorMessage message={rounds.error ?? error} />
+      {activeRound && latestNomination ? (
+        <View style={styles.stack}>
+          <Body>
+            Nominee:{' '}
+            {players.find((p) => p.uid === latestNomination.nomineePlayerId)
+              ?.displayName ?? latestNomination.nomineePlayerId}
+          </Body>
+          <Body muted>
+            Phase: {latestNomination.phase}. Threshold:{' '}
+            {latestNomination.majorityRequired} yes votes.
+          </Body>
+          {latestNomination.yesCount !== undefined && (
+            <Body>
+              Yes: {latestNomination.yesCount} · No:{' '}
+              {latestNomination.noCount ?? 0}
+            </Body>
+          )}
+          {latestNomination.phase === 'voting' && (
+            <View style={styles.row}>
+              <Button
+                label="Vote yes"
+                disabled={busy}
+                onPress={() =>
+                  void run(() =>
+                    api.castVote(
+                      game.id,
+                      activeRound.id,
+                      latestNomination.id,
+                      true,
+                    ),
+                  )
+                }
+              />
+              <Button
+                secondary
+                label="Vote no"
+                disabled={busy}
+                onPress={() =>
+                  void run(() =>
+                    api.castVote(
+                      game.id,
+                      activeRound.id,
+                      latestNomination.id,
+                      false,
+                    ),
+                  )
+                }
+              />
+            </View>
+          )}
+          <Button
+            secondary
+            label="Refresh vote deadline"
+            disabled={busy}
+            onPress={() =>
+              void run(() => api.resolveVote(game.id, activeRound.id))
+            }
+          />
+        </View>
+      ) : (
+        <View style={styles.stack}>
+          <Body muted>
+            Living players may nominate any living player, including themselves.
+          </Body>
+          <View style={styles.row}>
+            {players
+              .filter((p) => p.status === 'alive')
+              .map((player) => (
+                <Button
+                  key={player.uid}
+                  secondary
+                  disabled={busy}
+                  label={`Nominate ${player.uid === uid ? 'yourself' : player.displayName}`}
+                  onPress={() =>
+                    void run(() => api.nominate(game.id, player.uid))
+                  }
+                />
+              ))}
+          </View>
+        </View>
+      )}
     </Card>
   );
 }

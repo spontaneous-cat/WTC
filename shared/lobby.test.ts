@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_SETUP,
   createLobby,
+  advanceVote,
+  callNomination,
+  castBallot,
   joinLobby,
   renamePlayer,
   startGame,
@@ -98,6 +101,123 @@ describe('setup validation', () => {
     expect(gameCodeSchema.parse('000123')).toBe('000123');
     for (const code of ['12345', '1234567', 'ABC123', 123456])
       expect(gameCodeSchema.safeParse(code).success).toBe(false);
+  });
+});
+
+describe('vote rounds', () => {
+  it('reveals hidden deaths at nomination start without exposing roles', () => {
+    const active = start(fullLobby());
+    const hidden = {
+      ...active,
+      players: {
+        ...active.players,
+        b: {
+          ...active.players.b!,
+          status: 'dead' as const,
+          currentTeam: 'evil' as const,
+        },
+      },
+    };
+    const next = callNomination(hidden, 'a', 'a', 10_000, 'r1', 'n1');
+    const projected = projectGame(next);
+    expect(projected.players.b?.status).toBe('dead');
+    expect(projected.players.a).not.toHaveProperty('role');
+    expect(projected.game.activeVoteRoundId).toBe('r1');
+  });
+  it('requires living nominators and nominees and enforces participation cooldown', () => {
+    const active = start(fullLobby());
+    const dead = {
+      ...active,
+      players: {
+        ...active.players,
+        b: { ...active.players.b!, status: 'dead' as const },
+      },
+    };
+    expect(() => callNomination(dead, 'b', 'a', 10_000, 'r1', 'n1')).toThrow(
+      /living/i,
+    );
+    expect(() => callNomination(dead, 'a', 'b', 10_000, 'r1', 'n1')).toThrow(
+      /living/i,
+    );
+    const next = callNomination(active, 'a', 'a', 10_000, 'r1', 'n1');
+    expect(() => callNomination(next, 'a', 'b', 10_001, 'r2', 'n2')).toThrow(
+      /cooldown/i,
+    );
+  });
+  it('casts ballots only in voting, hides counts until permitted, and rejects duplicates', () => {
+    const active = callNomination(
+      start(fullLobby()),
+      'a',
+      'b',
+      10_000,
+      'r1',
+      'n1',
+    );
+    expect(() => castBallot(active, 'a', 'r1', 'n1', true, 10_000)).toThrow(
+      /not active/i,
+    );
+    const voting = advanceVote(
+      active,
+      'r1',
+      10_000 + setup.timers.discussion * 1000,
+    );
+    const voted = castBallot(voting, 'a', 'r1', 'n1', true, 130_001);
+    expect(() => castBallot(voted, 'a', 'r1', 'n1', true, 130_002)).toThrow(
+      /already/i,
+    );
+    expect(projectGame(voted).voteRounds.r1?.nominations[0]?.yesCount).toBe(1);
+    const hiddenSetup = {
+      ...voted,
+      setup: { ...voted.setup, visibleLiveVoting: false },
+    };
+    expect(
+      projectGame(hiddenSetup).voteRounds.r1?.nominations[0]?.yesCount,
+    ).toBeUndefined();
+  });
+  it('resolves majority execution and duplicate late resolution idempotently', () => {
+    let state = callNomination(
+      start(fullLobby()),
+      'a',
+      'b',
+      10_000,
+      'r1',
+      'n1',
+    );
+    state = advanceVote(state, 'r1', 130_000);
+    state = castBallot(state, 'a', 'r1', 'n1', true, 130_001);
+    state = castBallot(state, 'b', 'r1', 'n1', true, 130_002);
+    state = advanceVote(state, 'r1', 160_000);
+    expect(state.voteRounds?.r1?.currentCandidatePlayerId).toBe('b');
+    const ended = advanceVote(state, 'r1', 220_000);
+    expect(ended.players.b?.status).toBe('votedOut');
+    expect(advanceVote(ended, 'r1', 999_999)).toEqual(ended);
+  });
+  it('resolves tied passed nominations as no execution', () => {
+    let state = callNomination(
+      start(fullLobby()),
+      'a',
+      'b',
+      10_000,
+      'r1',
+      'n1',
+    );
+    state = advanceVote(state, 'r1', 130_000);
+    state = castBallot(state, 'a', 'r1', 'n1', true, 130_001);
+    state = castBallot(state, 'b', 'r1', 'n1', true, 130_002);
+    state = advanceVote(state, 'r1', 160_000);
+    state = callNomination(state, 'c', 'd', 170_000, 'ignored', 'n2');
+    state = advanceVote(state, 'r1', 290_000);
+    state = castBallot(state, 'c', 'r1', 'n2', true, 290_001);
+    state = castBallot(state, 'd', 'r1', 'n2', true, 290_002);
+    state = advanceVote(state, 'r1', 320_000);
+    state = advanceVote(state, 'r1', 380_000);
+    expect(state.voteRounds?.r1?.result?.noExecutionReason).toBe('tie');
+    expect(Object.values(state.players).map((p) => p.status)).toEqual([
+      'alive',
+      'alive',
+      'alive',
+      'alive',
+    ]);
   });
 });
 

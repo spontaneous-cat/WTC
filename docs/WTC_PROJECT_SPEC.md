@@ -246,6 +246,8 @@ Examples:
 - visible-voting setting if desired,
 - other timing/tolerance settings.
 
+Runtime timer edits should affect already-created active deadlines immediately where possible; if a phase has already passed, the server advances to the next valid phase instead of moving time backward.
+
 ---
 
 ## 6. Default Game Settings
@@ -325,13 +327,13 @@ When a vote starts:
 
 ## 8.3 Nomination Flow
 
-1. Living player nominates another player.
-2. Discussion timer starts.
+1. Living player nominates another living player. Self-nomination is allowed.
+2. Discussion timer starts. Once discussion starts, killing is not allowed until someone is executed or the vote fails.
 3. After discussion time ends, voting timer starts.
 4. Eligible living players cast one vote.
 5. Not voting counts as no vote / no execution support.
 6. If nominee receives majority support, they become the current execution candidate.
-7. Additional nominations may occur during the grace period.
+7. Additional nominations may occur during the grace period. A player who nominated or was nominated cannot nominate or be nominated again until the voting cooldown has expired.
 8. Later nominations can replace the current candidate only by meeting the required vote conditions.
 9. After grace period ends, final execution is resolved.
 10. Vote cooldown begins.
@@ -343,11 +345,22 @@ When a vote starts:
 - One vote per eligible living voter.
 - Dead players cannot vote.
 - Voted-out players cannot vote.
-- Majority is required.
+- Execution support requires at least half of eligible living voters, rounded up. Examples: 4 eligible voters require 2 yes votes; 5 eligible voters require 3 yes votes.
+- Ballots may be cast only during the voting phase, after discussion ends.
 - Ties result in no execution.
 - Specifically: if two nominees are tied for highest votes, nobody is executed.
 - Visible live voting is enabled by default.
-- If voting visibility is disabled, votes become visible after discussion/voting phase completes.
+- If voting visibility is disabled, individual voter choices are never revealed; only aggregate yes/no counts and final results become public after the voting phase completes.
+
+Boundary examples for implementation tests:
+
+- With 4 eligible living voters, 2 yes votes put the nominee on the block.
+- With 5 eligible living voters, 3 yes votes put the nominee on the block.
+- In hidden-voting games, Alice's yes/no choice is never shown publicly; only aggregate counts and results are shown.
+- A living player may nominate themselves.
+- A dead or voted-out player cannot nominate and cannot be nominated.
+- After Alice nominates Bob, Alice and Bob cannot nominate or be nominated again until the voting cooldown expires.
+- A kill report attempted after nomination starts is rejected until execution/no-execution resolves the round.
 
 ---
 

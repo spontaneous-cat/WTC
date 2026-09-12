@@ -4,6 +4,8 @@ export const ROLE_IDS = ['killer', 'minion', 'good', 'neutral_exile'] as const;
 export type RoleId = (typeof ROLE_IDS)[number];
 export type Team = 'good' | 'evil' | 'neutral';
 export type PlayerStatus = 'alive' | 'dead' | 'votedOut';
+export type VotePhase = 'discussion' | 'voting' | 'grace' | 'ended';
+export type NoExecutionReason = 'no_majority' | 'tie' | 'superseded';
 
 export const ROLES: Record<
   RoleId,
@@ -104,6 +106,10 @@ export interface PublicGame {
   playerIds: string[];
   createdAt: number;
   startedAt?: number;
+  endedAt?: number;
+  activeVoteRoundId?: string;
+  lastVoteEndedAt?: number;
+  winner?: { type: Team; playerId?: string; reason: string };
 }
 export interface PublicPlayer {
   uid: string;
@@ -121,8 +127,45 @@ export interface Profile {
   displayName: string;
   gameId: string | null;
 }
+export interface PublicVoteNomination {
+  id: string;
+  nominatedByPlayerId: string;
+  nomineePlayerId: string;
+  phase: VotePhase;
+  startedAt: number;
+  discussionEndsAt: number;
+  votingEndsAt: number;
+  yesCount?: number;
+  noCount?: number;
+  eligibleVoterCount: number;
+  majorityRequired: number;
+  result?: {
+    passed: boolean;
+    noExecutionReason?: NoExecutionReason;
+  };
+}
+export interface PublicVoteRound {
+  id: string;
+  status: VotePhase;
+  startedAt: number;
+  graceEndsAt: number;
+  nominations: PublicVoteNomination[];
+  currentCandidatePlayerId?: string;
+  result?: {
+    executedPlayerId?: string;
+    noExecutionReason?: NoExecutionReason;
+  };
+  endedAt?: number;
+}
 export interface PublicLogEntry {
-  type: 'game_started';
+  type:
+    | 'game_started'
+    | 'nomination_called'
+    | 'death_status_revealed'
+    | 'vote_result'
+    | 'player_executed'
+    | 'no_execution'
+    | 'game_ended';
   message: string;
   createdAt: number;
 }
@@ -136,6 +179,17 @@ export const joinGameSchema = z
   .strict();
 export const gameIdSchema = z.string().uuid();
 export const gameActionSchema = z.object({ gameId: gameIdSchema }).strict();
+export const nominationSchema = gameActionSchema.extend({
+  nomineePlayerId: z.string().min(1),
+});
+export const castVoteSchema = gameActionSchema.extend({
+  roundId: z.string().min(1),
+  nominationId: z.string().min(1),
+  vote: z.boolean(),
+});
+export const resolveVoteSchema = gameActionSchema.extend({
+  roundId: z.string().min(1),
+});
 export const updateSetupSchema = gameActionSchema.extend({
   setup: setupSchema,
 });
